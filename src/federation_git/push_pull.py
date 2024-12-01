@@ -27,7 +27,9 @@ class ProtocolFederationGitRepo(BaseModel):
     name: str
     group: bool = False
     # If not specified, federate across all NS indexes
-    indexes: Optional[list[str]] = None
+    indexes: Optional[list[str]] = Field(
+        default_factory=lambda: [],
+    )
 
 class ProtocolFederationGit(BaseModel):
     repos: list[ProtocolFederationGitRepo]
@@ -57,12 +59,11 @@ class ProtocolIndexGitHub(BaseModel):
     owner: str
 
 class PolicyIndex(BaseModel):
-    name: str
     protocol: str
     data: Any
 
 class PolicyDataNamespace(BaseModel):
-    indexes: list[PolicyIndex]
+    indexes: dict[str, PolicyIndex]
 
 class Owner(BaseModel):
     actors: list[str]
@@ -102,19 +103,25 @@ def federation_git(ctx: Context, active: ProtocolFederationGit):
 
     # TODO DEBUG REMOVE
     snoop.pp(current_user_namespaces)
-    return
 
+    # TODO ATProto push pull from threads where dids of replies match policy
     for repo in active.data.repos:
-        # TODO CHECK THIS LOGIC
-        if not repo.group or repo.namespace not in current_user_namespaces:
+        if (
+            (not repo.group and repo.namespace not in current_user_namespaces)
+            or not repo.namespace in ctx.policy.data.namespaces
+        ):
             continue
 
         # Perform git operations: clone, pull, push
-        print(f"Pushing to repo: {repo.namespace}/{repo.name}")
-
-        # TODO DEBUG REMOVE
+        snoop.pp(repo)
+        for index_key, index in ctx.policy.data.namespaces[repo.namespace].indexes.items():
+            if repo.indexes and index_key not in repo.indexes:
+                continue
+            snoop.pp(index)
+            remote_protocol = "https://"
+            remote_host = "github.com"
+            remote_url = f"{remote_protocol}{remote_host}/{repo.namespace}/{repo.name}.git"
         continue
-
         repo_dir = f"{repo.namespace}_{repo.name}"
         clone_url = f"git@github.com:{repo.namespace}/{repo.name}.git"  # Adjust as needed
 
@@ -122,7 +129,8 @@ def federation_git(ctx: Context, active: ProtocolFederationGit):
         if not os.path.isdir(repo_dir):
             print(f"Cloning repository {clone_url} into {repo_dir}")
             try:
-                subprocess.run(["git", "clone", clone_url, repo_dir], check=True)
+                # subprocess.run(["git", "clone", clone_url, repo_dir], check=True)
+                pass
             except subprocess.CalledProcessError as e:
                 print(f"Failed to clone repository {clone_url}: {e}")
                 continue
@@ -130,7 +138,8 @@ def federation_git(ctx: Context, active: ProtocolFederationGit):
             # Pull the latest changes
             print(f"Repository {repo_dir} exists. Pulling latest changes.")
             try:
-                subprocess.run(["git", "-C", repo_dir, "pull"], check=True)
+                # subprocess.run(["git", "-C", repo_dir, "pull"], check=True)
+                pass
             except subprocess.CalledProcessError as e:
                 print(f"Failed to pull repository {repo_dir}: {e}")
                 continue
@@ -138,7 +147,7 @@ def federation_git(ctx: Context, active: ProtocolFederationGit):
         # Push changes to the repository
         print(f"Pushing changes to repository {repo.namespace}/{repo.name}")
         try:
-            subprocess.run(["git", "-C", repo_dir, "push"], check=True)
+            # subprocess.run(["git", "-C", repo_dir, "push"], check=True)
             print(f"Successfully pushed to {repo.namespace}/{repo.name}.")
         except subprocess.CalledProcessError as e:
             print(f"Failed to push to repository {repo.namespace}/{repo.name}: {e}")
@@ -174,21 +183,19 @@ def build_federation_context(data):
     namespaces_dict = data.get('namespaces', {})
     namespaces = {}
     for ns_name, ns_data in namespaces_dict.items():
-        indexes_list = ns_data.get('indexes', [])
-        indexes = []
-        for index_data in indexes_list:
+        indexes_list = ns_data.get('indexes', {})
+        indexes = {}
+        for index_key, index_data in indexes_list.items():
             protocol_name = index_data.get("protocol", "")
             protocol_cls = load_protocol_cls(protocol_name)
             protocol = protocol_cls(**index_data.get("data", {}))
-            indexes.append(
-                PolicyIndex(
+            indexes[index_key] = PolicyIndex(
+                **{
+                    **index_data,
                     **{
-                        **index_data,
-                        **{
-                            "data": protocol,
-                        },
+                        "data": protocol,
                     },
-                ),
+                },
             )
         namespaces[ns_name] = PolicyDataNamespace(indexes=indexes)
 
