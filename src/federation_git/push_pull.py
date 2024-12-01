@@ -104,7 +104,13 @@ def federation_git(ctx: Context, active: ProtocolFederationGit):
     # TODO DEBUG REMOVE
     snoop.pp(current_user_namespaces)
 
-    # TODO ATProto push pull from threads where dids of replies match policy
+    # TODO ATProto push pull from threads where DIDs of replies match policy
+    # TODO Each user listed in upstream should update a policy file in their
+    # thread with their actively accepted (which means signed off) policy. This
+    # is needed due to others not knowing what commits they should accept from
+    # which DIDs unless those DIDs are in repo, but since that pull is reply
+    # restricted, the owner must also post the policy as a separate blob.
+    # https://github.com/dffml/dffml/blob/main/docs/tutorials/rolling_alice/0000_architecting_alice/0007_an_image.md
     for repo in active.data.repos:
         if (
             (not repo.group and repo.namespace not in current_user_namespaces)
