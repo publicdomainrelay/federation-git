@@ -1,0 +1,25 @@
+[project]
+name = "federation-git"
+version = "0.0.0"
+description = "Git based Federation"
+readme = {file = "README.md", content-type = "text/markdown"}
+authors = [
+    { name = "Public Domain", email = "publicdomainrelay@protonmail.com" }
+]
+license = {text = "Unlicense"}
+requires-python = ">=3.12"
+dependencies = [
+    "PyYAML>=6.0.2",
+    "pydantic>=2.10.2",
+]
+
+[project.urls]
+Repository = "https://github.com/publicdomainrelay/federation-git.git"
+Issues = "https://github.com/publicdomainrelay/federation-git/issues"
+
+[project.scripts]
+federation-git = "federation_git.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
