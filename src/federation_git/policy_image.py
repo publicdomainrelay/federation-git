@@ -1,16 +1,19 @@
-# cat src/federation_git/policy_image.py | python -u src/federation_git/policy_image.py > policy_image.png
+# cat ~/Documents/publicdomainrelay/gitatp/src/gitatp/update_profile.js | python -u src/federation_git/policy_image.py | tee policy_image.png | python -u src/federation_git/policy_image.py
 import sys
 import zipfile
 from io import BytesIO
+
+import magic
 from PIL import Image, ImageDraw, ImageFont
 
 # Create a zip archive containing the internal files
-def create_zip_of_files(file_name, file_contents):
+def create_zip_of_files(file_contents, file_name: str = "manifest"):
     zip_buffer = BytesIO()
+    mimetype = magic.from_buffer(file_contents, mime=True)
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        zipf.writestr(file_name, file_contents)
+        zipf.writestr(mimetype, file_contents)
     zip_buffer.seek(0)
-    return zip_buffer.read()
+    return mimetype, zip_buffer.read()
 
 def create_png_with_zip(zip_data, text_content):
     """
@@ -60,17 +63,35 @@ def create_png_with_zip(zip_data, text_content):
 
     return png_zip_data
 
-def main():
-    text_content = sys.stdin.read()
+def encode(input_data):
+    text_content = input_data.decode()
 
     # Create zip archive of internal files
-    zip_data = create_zip_of_files(sys.argv[-1], text_content)
+    mimetype, zip_data = create_zip_of_files(text_content)
 
     # Create PNG with embedded zip and rendered text
     png_zip_data = create_png_with_zip(zip_data, text_content)
 
     # Write out image
-    sys.stdout.buffer.write(png_zip_data)
+    return mimetype, png_zip_data
+
+def decode(data):
+    # Attempt to open the data as a zip file
+    with zipfile.ZipFile(BytesIO(data)) as zipf:
+        # Iterate through the files in the zip archive
+        for file_info in zipf.infolist():
+            with zipf.open(file_info) as file:
+                # Output the contents of each file to stdout
+                return file_info.orig_filename, file.read()
+
+def main():
+    input_data = sys.stdin.buffer.read()
+    if input_data.startswith(b"\x89PNG"):
+        mimetype, output_bytes = decode(input_data)
+    else:
+        mimetype, output_bytes = encode(input_data)
+    print(f"{mimetype}", file=sys.stderr)
+    sys.stdout.buffer.write(output_bytes)
 
 if __name__ == "__main__":
     main()
